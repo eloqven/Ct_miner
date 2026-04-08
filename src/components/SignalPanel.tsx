@@ -50,7 +50,7 @@ export function SignalPanel({
           <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
             {ASSETS.map((asset) => (
               <option key={asset.id} value={asset.id}>
-                {asset.symbol} · {asset.name}
+                {asset.symbol} - {asset.name}
               </option>
             ))}
           </select>

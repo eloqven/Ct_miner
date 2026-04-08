@@ -9,6 +9,7 @@ interface PortfolioPanelProps {
   history: number[];
   positions: Array<{
     assetId: string;
+    price: number | null;
     value: number;
     quantity: number;
   }>;
@@ -60,7 +61,7 @@ export function PortfolioPanel({
                 <div>
                   <strong>{asset?.symbol ?? position.assetId}</strong>
                   <small>
-                    {formatQuantity(position.quantity)} @ {formatPrice(position.value / position.quantity)}
+                    {formatQuantity(position.quantity)} @ {formatPrice(position.price)}
                   </small>
                 </div>
                 <strong>{formatCurrency(position.value)}</strong>

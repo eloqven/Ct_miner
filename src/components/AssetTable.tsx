@@ -77,6 +77,7 @@ export function AssetTable({
           const quote = quotes[asset.id];
           const quantity = holdings[asset.id] ?? 0;
           const hasPrice = typeof quote?.price === "number" && Number.isFinite(quote.price);
+          const hasChange = typeof quote?.change24h === "number" && Number.isFinite(quote.change24h);
           const positionValue = hasPrice ? quantity * quote!.price : 0;
           const isManual = asset.priceMode === "manual";
 
@@ -109,7 +110,7 @@ export function AssetTable({
 
               <div className="asset-cell">
                 <small>24h</small>
-                <strong className={quote && (quote.change24h ?? 0) >= 0 ? "positive" : "negative"}>
+                <strong className={hasChange ? (quote!.change24h! >= 0 ? "positive" : "negative") : ""}>
                   {quote ? formatPercent(quote.change24h) : "..."}
                 </strong>
               </div>
@@ -142,7 +143,7 @@ export function AssetTable({
                       type="number"
                       step="any"
                       min="0"
-                      value={manualPrices[asset.id] ?? ""}
+                      value={(manualPrices[asset.id] ?? 0) === 0 ? "" : manualPrices[asset.id]}
                       placeholder="0"
                       onChange={(event) => onManualPriceChange(asset.id, event.target.value)}
                     />

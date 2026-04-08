@@ -32,7 +32,7 @@ export function getLiveAssets(assets: AssetMeta[]) {
   return assets.filter((asset) => asset.priceMode !== "manual");
 }
 
-export async function fetchMarketQuotes(assets: AssetMeta[], manualPrices: Record<string, number>) {
+export async function fetchMarketQuotes(assets: AssetMeta[]) {
   const liveAssets = getLiveAssets(assets);
   const ids = liveAssets.map((asset) => asset.id).join(",");
   const map: MarketQuoteMap = {};
@@ -67,13 +67,19 @@ export async function fetchMarketQuotes(assets: AssetMeta[], manualPrices: Recor
     }
   }
 
+  return map;
+}
+
+export function mergeManualQuotes(baseQuotes: MarketQuoteMap, manualPrices: Record<string, number>) {
+  const mergedQuotes: MarketQuoteMap = { ...baseQuotes };
+
   for (const [assetId, price] of Object.entries(manualPrices)) {
     const asset = ASSET_BY_ID[assetId];
     if (!asset) {
       continue;
     }
 
-    map[assetId] = {
+    mergedQuotes[assetId] = {
       assetId,
       price,
       change24h: null,
@@ -84,7 +90,7 @@ export async function fetchMarketQuotes(assets: AssetMeta[], manualPrices: Recor
     };
   }
 
-  return map;
+  return mergedQuotes;
 }
 
 export function getRangeConfig(range: HistoryRange) {

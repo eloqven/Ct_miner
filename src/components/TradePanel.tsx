@@ -48,7 +48,7 @@ export function TradePanel({
           <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
             {ASSETS.filter((candidate) => candidate.id !== BASE_ASSET_ID).map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
-                {candidate.symbol} · {candidate.name}
+                {candidate.symbol} - {candidate.name}
               </option>
             ))}
           </select>

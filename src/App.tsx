@@ -16,7 +16,7 @@ import {
 import { usePersistentState } from "./hooks/usePersistentState";
 import { formatCompactCurrency, formatCurrency, formatPercent, formatPrice } from "./lib/format";
 import { summarizeTrend } from "./lib/indicators";
-import { fetchAssetCandles, fetchMarketQuotes, getRangeConfig } from "./lib/market";
+import { fetchAssetCandles, fetchMarketQuotes, getRangeConfig, mergeManualQuotes } from "./lib/market";
 import { evaluateSignals } from "./lib/signals";
 import { getChartCache, getRecentSnapshots, saveMarketSnapshot, setChartCache } from "./lib/storage";
 import type {
@@ -41,6 +41,10 @@ function readStoredQuotes() {
   } catch {
     return {};
   }
+}
+
+function getValidPrice(price: number | null | undefined) {
+  return typeof price === "number" && Number.isFinite(price) ? price : null;
 }
 
 function buildSignalLabel(assetId: string, metric: SignalMetric, threshold: number) {
@@ -70,7 +74,7 @@ function buildSignalLabel(assetId: string, metric: SignalMetric, threshold: numb
 }
 
 function App() {
-  const [quotes, setQuotes] = useState<MarketQuoteMap>(readStoredQuotes);
+  const [liveQuotes, setLiveQuotes] = useState<MarketQuoteMap>(readStoredQuotes);
   const [selectedAssetId, setSelectedAssetId] = useState("bitcoin");
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | "All">("All");
   const [search, setSearch] = useState("");
@@ -100,6 +104,12 @@ function App() {
   );
   const bootstrappedSignalsRef = useRef(false);
   const previousSignalMapRef = useRef<Record<string, boolean>>({});
+  const manualPricesRef = useRef(manualPrices);
+  const quotes = mergeManualQuotes(liveQuotes, manualPrices);
+
+  useEffect(() => {
+    manualPricesRef.current = manualPrices;
+  }, [manualPrices]);
 
   const normalizedSearch = deferredSearch.trim().toLowerCase();
   const filteredAssets = ASSETS.filter((asset) => {
@@ -116,16 +126,19 @@ function App() {
   const portfolioPositions = ASSETS.map((asset) => {
     const quantity = holdings[asset.id] ?? 0;
     const quote = quotes[asset.id];
+    const price = getValidPrice(quote?.price);
     return {
       assetId: asset.id,
       quantity,
-      value: quantity > 0 && quote ? quantity * quote.price : 0,
+      price,
+      value: quantity > 0 && price !== null ? quantity * price : 0,
     };
   })
     .filter((position) => position.quantity > 0)
     .sort((left, right) => right.value - left.value);
 
-  const cashValue = (holdings[BASE_ASSET_ID] ?? 0) * (quotes[BASE_ASSET_ID]?.price ?? 1);
+  const basePrice = getValidPrice(quotes[BASE_ASSET_ID]?.price) ?? 1;
+  const cashValue = (holdings[BASE_ASSET_ID] ?? 0) * basePrice;
   const investedValue = portfolioPositions
     .filter((position) => position.assetId !== BASE_ASSET_ID)
     .reduce((total, position) => total + position.value, 0);
@@ -134,7 +147,7 @@ function App() {
   const categoryBuckets = new Map<string, { total: number; count: number }>();
   for (const asset of ASSETS) {
     const quote = quotes[asset.id];
-    if (!quote || quote.change24h === null) {
+    if (!quote || quote.change24h === null || !Number.isFinite(quote.change24h)) {
       continue;
     }
 
@@ -162,35 +175,38 @@ function App() {
       ASSETS.reduce((total, asset) => {
         const quantity = holdings[asset.id] ?? 0;
         const quote = snapshot.quotes[asset.id];
-        if (!quote || quantity === 0) {
+        const price = getValidPrice(quote?.price);
+        if (price === null || quantity === 0) {
           return total;
         }
 
-        return total + quantity * quote.price;
+        return total + quantity * price;
       }, 0),
     )
     .filter((value) => Number.isFinite(value) && value > 0);
 
   const signalEvaluations = evaluateSignals(signalRules, quotes, holdings, candlesByAsset);
+  const manualPriceEntries = Object.entries(manualPrices).filter(([assetId]) => ASSET_BY_ID[assetId]);
 
   async function loadSnapshots() {
     const recent = await getRecentSnapshots(Date.now() - 7 * 24 * 60 * 60 * 1000);
     setSnapshots(recent);
   }
 
-  async function persistQuotes(nextQuotes: MarketQuoteMap) {
-    setQuotes(nextQuotes);
+  async function persistLiveQuotes(nextQuotes: MarketQuoteMap) {
+    setLiveQuotes(nextQuotes);
     window.localStorage.setItem(QUOTE_STORAGE_KEY, JSON.stringify(nextQuotes));
-    await saveMarketSnapshot(nextQuotes);
-    await loadSnapshots();
   }
 
   async function refreshMarketData() {
     try {
-      const freshQuotes = await fetchMarketQuotes(ASSETS, manualPrices);
+      const freshQuotes = await fetchMarketQuotes(ASSETS);
+      const snapshotQuotes = mergeManualQuotes(freshQuotes, manualPricesRef.current);
       setMarketError(null);
       setLastSyncedAt(Date.now());
-      await persistQuotes(freshQuotes);
+      await persistLiveQuotes(freshQuotes);
+      await saveMarketSnapshot(snapshotQuotes);
+      await loadSnapshots();
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : "Unable to refresh market data.");
     }
@@ -205,27 +221,6 @@ function App() {
 
     return () => window.clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (Object.keys(quotes).length === 0) {
-      return;
-    }
-
-    const mergedQuotes: MarketQuoteMap = { ...quotes };
-    for (const [assetId, price] of Object.entries(manualPrices)) {
-      mergedQuotes[assetId] = {
-        assetId,
-        price,
-        change24h: null,
-        marketCap: null,
-        volume24h: null,
-        lastUpdated: new Date().toISOString(),
-        source: "manual",
-      };
-    }
-
-    void persistQuotes(mergedQuotes);
-  }, [manualPrices]);
 
   useEffect(() => {
     let active = true;
@@ -524,7 +519,7 @@ function App() {
               <div>
                 <p className="eyebrow">Selected asset</p>
                 <h2>
-                  {ASSET_BY_ID[selectedAssetId].name} · {ASSET_BY_ID[selectedAssetId].symbol}
+                  {ASSET_BY_ID[selectedAssetId].name} - {ASSET_BY_ID[selectedAssetId].symbol}
                 </h2>
               </div>
               <div className="range-switcher">
@@ -548,7 +543,15 @@ function App() {
               </div>
               <div className="selected-asset-stat">
                 <small>24h</small>
-                <strong className={selectedQuote && (selectedQuote.change24h ?? 0) >= 0 ? "positive" : "negative"}>
+                <strong
+                  className={
+                    typeof selectedQuote?.change24h === "number" && Number.isFinite(selectedQuote.change24h)
+                      ? selectedQuote.change24h >= 0
+                        ? "positive"
+                        : "negative"
+                      : ""
+                  }
+                >
                   {selectedQuote ? formatPercent(selectedQuote.change24h) : "n/a"}
                 </strong>
               </div>
@@ -615,7 +618,7 @@ function App() {
               </div>
             </div>
             <div className="position-list">
-              {Object.entries(manualPrices).map(([assetId, price]) => (
+              {manualPriceEntries.map(([assetId, price]) => (
                 <div key={assetId} className="position-row">
                   <div>
                     <strong>{ASSET_BY_ID[assetId].symbol}</strong>

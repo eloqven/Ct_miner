@@ -7,6 +7,15 @@ const SNAPSHOT_STORE = "market-snapshots";
 const CHART_CACHE_STORE = "chart-cache";
 const MAX_SNAPSHOTS = 720;
 
+function createSnapshotId(timestamp: number) {
+  const suffix =
+    typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+
+  return `${timestamp}-${suffix}`;
+}
+
 const dbPromise = openDB(DB_NAME, DB_VERSION, {
   upgrade(database) {
     if (!database.objectStoreNames.contains(SNAPSHOT_STORE)) {
@@ -23,9 +32,10 @@ const dbPromise = openDB(DB_NAME, DB_VERSION, {
 
 export async function saveMarketSnapshot(quotes: MarketQuoteMap) {
   const db = await dbPromise;
+  const timestamp = Date.now();
   const record: MarketSnapshotRecord = {
-    id: `${Date.now()}`,
-    timestamp: Date.now(),
+    id: createSnapshotId(timestamp),
+    timestamp,
     quotes,
   };
 

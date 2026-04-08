@@ -3,6 +3,10 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 }
 
 export function formatCurrency(value: number, maximumFractionDigits = 2) {
+  if (!isFiniteNumber(value)) {
+    return "n/a";
+  }
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -11,6 +15,10 @@ export function formatCurrency(value: number, maximumFractionDigits = 2) {
 }
 
 export function formatCompactCurrency(value: number) {
+  if (!isFiniteNumber(value)) {
+    return "n/a";
+  }
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -48,6 +56,10 @@ export function formatPercent(value: number | null) {
 }
 
 export function formatQuantity(value: number) {
+  if (!isFiniteNumber(value)) {
+    return "n/a";
+  }
+
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 8,
   }).format(value);

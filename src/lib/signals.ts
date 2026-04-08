@@ -24,7 +24,8 @@ export function evaluateSignals(
   return rules.map<SignalEvaluation>((rule) => {
     const quote = quotes[rule.assetId];
     const quantity = holdings[rule.assetId] ?? 0;
-    const positionValue = quote ? quantity * quote.price : 0;
+    const price = typeof quote?.price === "number" && Number.isFinite(quote.price) ? quote.price : null;
+    const positionValue = price !== null ? quantity * price : 0;
     const candles = candlesByAsset[rule.assetId] ?? [];
     const sma20 = calculateSma(candles, 20);
     const sma50 = calculateSma(candles, 50);
@@ -35,11 +36,11 @@ export function evaluateSignals(
 
     switch (rule.metric) {
       case "price_above":
-        currentValue = quote?.price ?? 0;
+        currentValue = price ?? 0;
         triggered = currentValue >= rule.threshold;
         break;
       case "price_below":
-        currentValue = quote?.price ?? 0;
+        currentValue = price ?? 0;
         triggered = currentValue <= rule.threshold;
         break;
       case "change_above":
