@@ -21,6 +21,7 @@ export const ASSETS: AssetMeta[] = [
   { id: "dogecoin", symbol: "DOGE", name: "Dogecoin", categories: ["Meme"], priceMode: "live" },
   { id: "shiba-inu", symbol: "SHIB", name: "Shiba Inu", categories: ["Meme"], priceMode: "live" },
   { id: "pepe", symbol: "PEPE", name: "Pepe", categories: ["Meme"], priceMode: "live" },
+  { id: "the-open-network", symbol: "TON", name: "Toncoin", categories: ["Layer 1"], priceMode: "live" },
   { id: "tron", symbol: "TRX", name: "Tron", categories: ["Layer 1"], priceMode: "live" },
   { id: "litecoin", symbol: "LTC", name: "Litecoin", categories: ["Payments"], priceMode: "live" },
   { id: "bitcoin-cash", symbol: "BCH", name: "Bitcoin Cash", categories: ["Payments"], priceMode: "live" },

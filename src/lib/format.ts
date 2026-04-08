@@ -1,3 +1,7 @@
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 export function formatCurrency(value: number, maximumFractionDigits = 2) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -15,7 +19,11 @@ export function formatCompactCurrency(value: number) {
   }).format(value);
 }
 
-export function formatPrice(value: number) {
+export function formatPrice(value: number | null | undefined) {
+  if (!isFiniteNumber(value)) {
+    return "n/a";
+  }
+
   if (value >= 1000) {
     return formatCurrency(value, 2);
   }

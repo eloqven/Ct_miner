@@ -76,7 +76,8 @@ export function AssetTable({
         {assets.map((asset) => {
           const quote = quotes[asset.id];
           const quantity = holdings[asset.id] ?? 0;
-          const positionValue = quote ? quantity * quote.price : 0;
+          const hasPrice = typeof quote?.price === "number" && Number.isFinite(quote.price);
+          const positionValue = hasPrice ? quantity * quote!.price : 0;
           const isManual = asset.priceMode === "manual";
 
           return (
@@ -103,7 +104,7 @@ export function AssetTable({
 
               <div className="asset-cell">
                 <small>Price</small>
-                <strong>{quote ? formatPrice(quote.price) : "..."}</strong>
+                <strong>{hasPrice ? formatPrice(quote?.price) : "..."}</strong>
               </div>
 
               <div className="asset-cell">

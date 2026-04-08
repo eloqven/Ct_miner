@@ -45,26 +45,27 @@ function readStoredQuotes() {
 
 function buildSignalLabel(assetId: string, metric: SignalMetric, threshold: number) {
   const asset = ASSET_BY_ID[assetId];
+  const label = asset?.symbol ?? assetId;
 
   switch (metric) {
     case "price_above":
-      return `${asset.symbol} price > ${formatCurrency(threshold)}`;
+      return `${label} price > ${formatCurrency(threshold)}`;
     case "price_below":
-      return `${asset.symbol} price < ${formatCurrency(threshold)}`;
+      return `${label} price < ${formatCurrency(threshold)}`;
     case "change_above":
-      return `${asset.symbol} 24h > ${threshold}%`;
+      return `${label} 24h > ${threshold}%`;
     case "change_below":
-      return `${asset.symbol} 24h < ${threshold}%`;
+      return `${label} 24h < ${threshold}%`;
     case "position_value_above":
-      return `${asset.symbol} position > ${formatCurrency(threshold)}`;
+      return `${label} position > ${formatCurrency(threshold)}`;
     case "position_value_below":
-      return `${asset.symbol} position < ${formatCurrency(threshold)}`;
+      return `${label} position < ${formatCurrency(threshold)}`;
     case "sma20_above_sma50":
-      return `${asset.symbol} SMA20 > SMA50`;
+      return `${label} SMA20 > SMA50`;
     case "rsi_above":
-      return `${asset.symbol} RSI > ${threshold}`;
+      return `${label} RSI > ${threshold}`;
     case "rsi_below":
-      return `${asset.symbol} RSI < ${threshold}`;
+      return `${label} RSI < ${threshold}`;
   }
 }
 
@@ -429,8 +430,14 @@ function App() {
     if (!quote) {
       return "Live price missing for that asset.";
     }
+    if (!Number.isFinite(quote.price) || quote.price <= 0) {
+      return "Asset price must be greater than zero before trading.";
+    }
 
     const basePrice = quotes[BASE_ASSET_ID]?.price ?? 1;
+    if (!Number.isFinite(basePrice) || basePrice <= 0) {
+      return "USDT price is invalid.";
+    }
     const baseQuantity = holdings[BASE_ASSET_ID] ?? 0;
     const baseRequired = draft.usdAmount / basePrice;
     const assetQuantityDelta = draft.usdAmount / quote.price;
