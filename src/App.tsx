@@ -347,7 +347,7 @@ function App() {
     signalEvaluations.forEach((evaluation) => {
       const previous = previousSignalMapRef.current[evaluation.rule.id] ?? false;
       if (evaluation.triggered && !previous && evaluation.rule.notify) {
-        new Notification("CT Miner signal", {
+        new Notification("NC Wallet Tracker signal", {
           body: evaluation.description,
         });
       }
@@ -475,7 +475,7 @@ function App() {
 
       <header className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">CT Miner</p>
+          <p className="eyebrow">NC Wallet Tracker</p>
           <h1>Trading desk for wallet emulation, cached market structure, and signal watch.</h1>
           <p className="hero-text">
             The old repo was a single static page. This rebuild turns it into a React workstation with manual

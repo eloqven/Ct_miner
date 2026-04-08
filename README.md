@@ -1,6 +1,6 @@
-# CT Miner
+# NC Wallet Tracker
 
-CT Miner is a browser-based crypto workstation built around your actual use case:
+NC Wallet Tracker is a browser-based crypto workstation built around your actual use case:
 
 - track a hand-picked market universe
 - enter exact wallet balances yourself

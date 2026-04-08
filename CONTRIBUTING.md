@@ -2,7 +2,7 @@
 
 ## Scope
 
-CT Miner is evolving quickly, so contributions should stay focused on the current product direction:
+NC Wallet Tracker is evolving quickly, so contributions should stay focused on the current product direction:
 
 - crypto market tracking
 - wallet-aware portfolio tooling

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is intended to be a respectful, practical, and focused space for collaboration on CT Miner.
+This repository is intended to be a respectful, practical, and focused space for collaboration on NC Wallet Tracker.
 
 ## Expected Behavior
 
