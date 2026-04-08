@@ -86,3 +86,27 @@ export interface SignalEvaluation {
   currentValue: number;
   description: string;
 }
+
+export interface WalletStatementTransaction {
+  id: string;
+  rowNumber: number;
+  coinName: string;
+  symbol: string;
+  amount: number;
+  timestamp: string;
+  timestampMs: number;
+  displayDate: string;
+  rawLine: string;
+}
+
+export interface WalletStatementSnapshot {
+  id: string;
+  fileName: string;
+  importedAt: number;
+  userId: string;
+  userName: string;
+  transactionCount: number;
+  statementTimestamp: number;
+  balances: Record<string, number>;
+  transactions: WalletStatementTransaction[];
+}

@@ -3,16 +3,16 @@
 :root {
   color-scheme: dark;
   font-family: "IBM Plex Sans", sans-serif;
-  --bg: #09111a;
-  --panel: rgba(13, 22, 34, 0.84);
-  --line: rgba(140, 161, 185, 0.18);
-  --text: #edf3fb;
-  --muted: #90a3b9;
-  --accent: #33d69f;
-  --cool: #6ab7ff;
-  --warm: #f4b648;
-  --danger: #ff7b74;
-  --shadow: 0 20px 70px rgba(0, 0, 0, 0.34);
+  --bg: #0f1724;
+  --panel: rgba(18, 25, 38, 0.9);
+  --line: rgba(148, 163, 184, 0.16);
+  --text: #e8eef7;
+  --muted: #9fb0c5;
+  --accent: #78d7c8;
+  --cool: #8bbcff;
+  --warm: #f1bf6b;
+  --danger: #ff8f88;
+  --shadow: 0 14px 38px rgba(3, 9, 18, 0.26);
 }
 
 * {
@@ -28,9 +28,9 @@ body,
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(37, 91, 150, 0.22), transparent 32%),
-    radial-gradient(circle at top right, rgba(51, 214, 159, 0.14), transparent 24%),
-    linear-gradient(180deg, #0a121c 0%, #05090f 100%);
+    radial-gradient(circle at top left, rgba(90, 123, 172, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(120, 215, 200, 0.12), transparent 24%),
+    linear-gradient(180deg, #0f1724 0%, #0b1220 100%);
   color: var(--text);
 }
 
@@ -47,6 +47,8 @@ button {
 .app-shell {
   position: relative;
   overflow: hidden;
+  max-width: 980px;
+  margin: 0 auto;
   padding: 32px clamp(20px, 4vw, 40px) 48px;
 }
 
@@ -82,9 +84,9 @@ button {
 
 .hero {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 24px;
-  align-items: end;
+  align-items: start;
   margin-bottom: 24px;
   animation: rise 0.55s ease both;
 }
@@ -124,7 +126,8 @@ button {
 
 .hero-actions {
   display: grid;
-  justify-items: end;
+  grid-template-columns: repeat(3, auto);
+  justify-items: start;
   gap: 12px;
 }
 
@@ -170,22 +173,22 @@ button {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 1.25fr) minmax(440px, 1.5fr) minmax(320px, 0.95fr);
-  gap: 18px;
+  grid-template-columns: 1fr;
+  gap: 24px;
   align-items: start;
 }
 
 .stack {
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .panel {
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 28px;
   background: var(--panel);
   box-shadow: var(--shadow);
-  padding: 20px;
+  padding: 24px;
   animation: rise 0.7s ease both;
 }
 
@@ -205,7 +208,7 @@ button {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   text-align: right;
 }
 
@@ -227,6 +230,21 @@ button {
   margin-bottom: 16px;
 }
 
+.trade-value-grid {
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+}
+
+.trade-pair-grid {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+}
+
+.swap-pair-button {
+  min-width: 88px;
+  height: 48px;
+  align-self: end;
+}
+
 .field,
 .checkbox {
   display: grid;
@@ -242,12 +260,30 @@ button {
 input,
 select {
   width: 100%;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid rgba(140, 161, 185, 0.24);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
   color: var(--text);
   outline: none;
+}
+
+.long-input {
+  min-width: 0;
+  letter-spacing: 0.03em;
+}
+
+.input-with-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.input-action-button {
+  min-width: 78px;
+  height: 48px;
+  padding-inline: 14px;
 }
 
 input:focus,
@@ -319,7 +355,7 @@ select:focus {
 .asset-list {
   display: grid;
   gap: 10px;
-  max-height: 860px;
+  max-height: 1080px;
   overflow: auto;
   padding-right: 4px;
 }
@@ -408,6 +444,65 @@ select:focus {
 .asset-qty span {
   color: var(--muted);
   font-size: 0.76rem;
+}
+
+.asset-qty input {
+  min-width: 210px;
+}
+
+.statement-panel {
+  overflow: hidden;
+}
+
+.statement-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.file-input-button {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-input-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.statement-note {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
+.statement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statement-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.statement-column h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .chart-panel .panel-header {
@@ -550,33 +645,35 @@ select:focus {
 }
 
 @media (max-width: 1380px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
   .analysis-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 900px) {
-  .hero {
-    flex-direction: column;
-    align-items: start;
-  }
-
   .hero-actions {
     width: 100%;
+    grid-template-columns: 1fr;
     justify-items: stretch;
   }
 
   .filter-grid,
   .signal-grid,
   .trade-grid,
+  .statement-grid,
+  .statement-columns,
   .selected-asset-grid,
   .analysis-grid,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .trade-pair-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .swap-pair-button {
+    width: 100%;
   }
 
   .asset-row {

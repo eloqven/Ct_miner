@@ -102,3 +102,4 @@ export const DEFAULT_SIGNAL_RULES: SignalRule[] = [
 ];
 
 export const ASSET_BY_ID = Object.fromEntries(ASSETS.map((asset) => [asset.id, asset]));
+export const ASSET_BY_SYMBOL = Object.fromEntries(ASSETS.map((asset) => [asset.symbol, asset]));

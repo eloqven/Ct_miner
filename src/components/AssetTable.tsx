@@ -1,4 +1,5 @@
-import { startTransition } from "react";
+import { startTransition, useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { CATEGORY_ORDER } from "../data/assets";
 import type { AssetCategory, AssetMeta, MarketQuoteMap } from "../types";
 import { formatCompactCurrency, formatPercent, formatPrice } from "../lib/format";
@@ -18,6 +19,57 @@ interface AssetTableProps {
   onManualPriceChange: (assetId: string, rawValue: string) => void;
 }
 
+function isDecimalDraft(value: string) {
+  return /^\d*(?:[.,]\d*)?$/.test(value);
+}
+
+function normalizeDecimalDraft(value: string) {
+  return value.replace(",", ".");
+}
+
+function formatInputValue(value: number | undefined, fractionDigits?: number) {
+  if (!value || !Number.isFinite(value)) {
+    return "";
+  }
+
+  if (typeof fractionDigits === "number") {
+    return value.toFixed(fractionDigits);
+  }
+
+  return String(value);
+}
+
+function syncDrafts(
+  current: Record<string, string>,
+  nextValues: Record<string, number>,
+  fractionDigits?: number,
+) {
+  let changed = false;
+  const nextDrafts = { ...current };
+
+  for (const [key, draft] of Object.entries(current)) {
+    const normalized = normalizeDecimalDraft(draft);
+    const persistedValue = nextValues[key] ?? 0;
+
+    if (normalized === "." || normalized === "") {
+      if (normalized === "" && persistedValue === 0) {
+        continue;
+      }
+      if (normalized === ".") {
+        continue;
+      }
+    }
+
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed !== persistedValue) {
+      nextDrafts[key] = formatInputValue(persistedValue, fractionDigits);
+      changed = true;
+    }
+  }
+
+  return changed ? nextDrafts : current;
+}
+
 export function AssetTable({
   assets,
   holdings,
@@ -32,6 +84,57 @@ export function AssetTable({
   onQuantityChange,
   onManualPriceChange,
 }: AssetTableProps) {
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setQuantityDrafts((current) => syncDrafts(current, holdings, 8));
+  }, [holdings]);
+
+  useEffect(() => {
+    setManualPriceDrafts((current) => syncDrafts(current, manualPrices));
+  }, [manualPrices]);
+
+  function handleDraftChange(
+    assetId: string,
+    rawValue: string,
+    setDrafts: Dispatch<SetStateAction<Record<string, string>>>,
+    onValueChange: (assetId: string, rawValue: string) => void,
+  ) {
+    if (!isDecimalDraft(rawValue)) {
+      return;
+    }
+
+    setDrafts((current) => ({
+      ...current,
+      [assetId]: rawValue,
+    }));
+
+    const normalized = normalizeDecimalDraft(rawValue);
+    if (normalized === "") {
+      onValueChange(assetId, "");
+      return;
+    }
+
+    if (normalized === ".") {
+      return;
+    }
+
+    onValueChange(assetId, normalized);
+  }
+
+  function handleDraftBlur(
+    assetId: string,
+    persistedValue: number,
+    setDrafts: Dispatch<SetStateAction<Record<string, string>>>,
+    fractionDigits?: number,
+  ) {
+    setDrafts((current) => ({
+      ...current,
+      [assetId]: formatInputValue(persistedValue, fractionDigits),
+    }));
+  }
+
   return (
     <section className="panel">
       <div className="panel-header">
@@ -122,12 +225,14 @@ export function AssetTable({
               >
                 <span>Qty</span>
                 <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={quantity === 0 ? "" : quantity}
+                  type="text"
+                  inputMode="decimal"
+                  value={quantityDrafts[asset.id] ?? formatInputValue(quantity, 8)}
                   placeholder="0"
-                  onChange={(event) => onQuantityChange(asset.id, event.target.value)}
+                  onChange={(event) =>
+                    handleDraftChange(asset.id, event.target.value, setQuantityDrafts, onQuantityChange)
+                  }
+                  onBlur={() => handleDraftBlur(asset.id, quantity, setQuantityDrafts, 8)}
                 />
               </label>
 
@@ -140,12 +245,16 @@ export function AssetTable({
                   >
                     <span>Manual USD</span>
                     <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={(manualPrices[asset.id] ?? 0) === 0 ? "" : manualPrices[asset.id]}
+                      type="text"
+                      inputMode="decimal"
+                      value={manualPriceDrafts[asset.id] ?? formatInputValue(manualPrices[asset.id])}
                       placeholder="0"
-                      onChange={(event) => onManualPriceChange(asset.id, event.target.value)}
+                      onChange={(event) =>
+                        handleDraftChange(asset.id, event.target.value, setManualPriceDrafts, onManualPriceChange)
+                      }
+                      onBlur={() =>
+                        handleDraftBlur(asset.id, manualPrices[asset.id] ?? 0, setManualPriceDrafts)
+                      }
                     />
                   </label>
                 ) : (

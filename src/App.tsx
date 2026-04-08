@@ -4,10 +4,12 @@ import { CandlestickChart } from "./components/CandlestickChart";
 import { CategoryPulse } from "./components/CategoryPulse";
 import { PortfolioPanel } from "./components/PortfolioPanel";
 import { SignalPanel } from "./components/SignalPanel";
+import { StatementImporter } from "./components/StatementImporter";
 import { TradePanel } from "./components/TradePanel";
 import {
   ASSETS,
   ASSET_BY_ID,
+  ASSET_BY_SYMBOL,
   BASE_ASSET_ID,
   DEFAULT_HOLDINGS,
   DEFAULT_MANUAL_PRICES,
@@ -18,6 +20,7 @@ import { formatCompactCurrency, formatCurrency, formatPercent, formatPrice } fro
 import { summarizeTrend } from "./lib/indicators";
 import { fetchAssetCandles, fetchMarketQuotes, getRangeConfig, mergeManualQuotes } from "./lib/market";
 import { evaluateSignals } from "./lib/signals";
+import { parseWalletStatementPdf } from "./lib/statementImport";
 import { getChartCache, getRecentSnapshots, saveMarketSnapshot, setChartCache } from "./lib/storage";
 import type {
   AssetCategory,
@@ -27,12 +30,14 @@ import type {
   MarketSnapshotRecord,
   SignalMetric,
   SignalRule,
+  WalletStatementSnapshot,
 } from "./types";
 
 const QUOTE_STORAGE_KEY = "ct-miner-latest-quotes";
 const HOLDINGS_STORAGE_KEY = "ct-miner-holdings";
 const SIGNALS_STORAGE_KEY = "ct-miner-signals";
 const MANUAL_PRICES_STORAGE_KEY = "ct-miner-manual-prices";
+const STATEMENT_IMPORTS_STORAGE_KEY = "nc-wallet-tracker-statement-imports";
 
 function readStoredQuotes() {
   try {
@@ -91,6 +96,10 @@ function App() {
     SIGNALS_STORAGE_KEY,
     DEFAULT_SIGNAL_RULES,
   );
+  const [statementSnapshots, setStatementSnapshots] = usePersistentState<WalletStatementSnapshot[]>(
+    STATEMENT_IMPORTS_STORAGE_KEY,
+    [],
+  );
   const [snapshots, setSnapshots] = useState<MarketSnapshotRecord[]>([]);
   const [candles, setCandles] = useState<CandlePoint[]>([]);
   const [candlesByAsset, setCandlesByAsset] = useState<Record<string, CandlePoint[]>>({});
@@ -99,6 +108,8 @@ function App() {
   const [chartError, setChartError] = useState<string | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [statementImportError, setStatementImportError] = useState<string | null>(null);
+  const [statementImporting, setStatementImporting] = useState(false);
   const [notificationsPermission, setNotificationsPermission] = useState<NotificationPermission>(
     typeof Notification === "undefined" ? "denied" : Notification.permission,
   );
@@ -106,6 +117,10 @@ function App() {
   const previousSignalMapRef = useRef<Record<string, boolean>>({});
   const manualPricesRef = useRef(manualPrices);
   const quotes = mergeManualQuotes(liveQuotes, manualPrices);
+  const latestStatement = [...statementSnapshots].sort(
+    (left, right) =>
+      right.statementTimestamp - left.statementTimestamp || right.importedAt - left.importedAt,
+  )[0] ?? null;
 
   useEffect(() => {
     manualPricesRef.current = manualPrices;
@@ -187,6 +202,63 @@ function App() {
 
   const signalEvaluations = evaluateSignals(signalRules, quotes, holdings, candlesByAsset);
   const manualPriceEntries = Object.entries(manualPrices).filter(([assetId]) => ASSET_BY_ID[assetId]);
+
+  async function importStatementFiles(files: FileList | null) {
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    setStatementImporting(true);
+    setStatementImportError(null);
+
+    try {
+      const parsedSnapshots = await Promise.all(Array.from(files).map((file) => parseWalletStatementPdf(file)));
+
+      setStatementSnapshots((current) => {
+        const next = [...current];
+        for (const snapshot of parsedSnapshots) {
+          const existingIndex = next.findIndex((entry) => entry.id === snapshot.id);
+          if (existingIndex >= 0) {
+            next[existingIndex] = snapshot;
+          } else {
+            next.push(snapshot);
+          }
+        }
+
+        return next
+          .sort(
+            (left, right) =>
+              right.statementTimestamp - left.statementTimestamp || right.importedAt - left.importedAt,
+          )
+          .slice(0, 40);
+      });
+    } catch (error) {
+      setStatementImportError(error instanceof Error ? error.message : "Unable to parse the statement PDF.");
+    } finally {
+      setStatementImporting(false);
+    }
+  }
+
+  function applyImportedBalances() {
+    if (!latestStatement) {
+      return;
+    }
+
+    setHoldings((current) => {
+      const next = { ...current };
+
+      for (const [symbol, amount] of Object.entries(latestStatement.balances)) {
+        const asset = ASSET_BY_SYMBOL[symbol];
+        if (!asset) {
+          continue;
+        }
+
+        next[asset.id] = Number(amount.toFixed(8));
+      }
+
+      return next;
+    });
+  }
 
   async function loadSnapshots() {
     const recent = await getRecentSnapshots(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -416,47 +488,49 @@ function App() {
     setSignalRules((current) => current.filter((rule) => rule.id !== ruleId));
   }
 
-  function executeTrade(draft: { assetId: string; side: "buy" | "sell"; usdAmount: number }) {
+  function executeTrade(draft: { fromAssetId: string; toAssetId: string; usdAmount: number }) {
     if (draft.usdAmount < 7) {
-      return "Minimum notional is $7 for the fee-free emulator.";
+      return "Minimum notional is $7 for the fee-free swap emulator.";
     }
 
-    const quote = quotes[draft.assetId];
-    if (!quote) {
-      return "Live price missing for that asset.";
-    }
-    if (!Number.isFinite(quote.price) || quote.price <= 0) {
-      return "Asset price must be greater than zero before trading.";
+    if (draft.fromAssetId === draft.toAssetId) {
+      return "Choose two different assets for the swap.";
     }
 
-    const basePrice = quotes[BASE_ASSET_ID]?.price ?? 1;
-    if (!Number.isFinite(basePrice) || basePrice <= 0) {
-      return "USDT price is invalid.";
-    }
-    const baseQuantity = holdings[BASE_ASSET_ID] ?? 0;
-    const baseRequired = draft.usdAmount / basePrice;
-    const assetQuantityDelta = draft.usdAmount / quote.price;
-
-    if (draft.side === "buy" && baseQuantity < baseRequired) {
-      return "Not enough USDT to simulate that buy.";
+    if (!ASSET_BY_ID[draft.fromAssetId] || !ASSET_BY_ID[draft.toAssetId]) {
+      return "Both swap assets must exist in the tracked list.";
     }
 
-    const currentAssetQuantity = holdings[draft.assetId] ?? 0;
-    if (draft.side === "sell" && currentAssetQuantity * quote.price < draft.usdAmount) {
-      return "Not enough asset value to simulate that sell.";
+    const fromQuote = quotes[draft.fromAssetId];
+    const toQuote = quotes[draft.toAssetId];
+    if (!fromQuote || !toQuote) {
+      return "Missing price data for one of the selected assets.";
     }
+
+    if (!Number.isFinite(fromQuote.price) || fromQuote.price <= 0) {
+      return "Source asset price must be greater than zero before swapping.";
+    }
+    if (!Number.isFinite(toQuote.price) || toQuote.price <= 0) {
+      return "Target asset price must be greater than zero before swapping.";
+    }
+
+    const sourceQuantity = holdings[draft.fromAssetId] ?? 0;
+    const sourceValueUsd = sourceQuantity * fromQuote.price;
+    if (sourceValueUsd < draft.usdAmount) {
+      return `Not enough ${ASSET_BY_ID[draft.fromAssetId].symbol} value to simulate that swap.`;
+    }
+
+    const sourceQuantityDelta = draft.usdAmount / fromQuote.price;
+    const targetQuantityDelta = draft.usdAmount / toQuote.price;
 
     setHoldings((current) => {
-      const nextBase = draft.side === "buy" ? baseQuantity - baseRequired : baseQuantity + baseRequired;
-      const nextAsset =
-        draft.side === "buy"
-          ? currentAssetQuantity + assetQuantityDelta
-          : Math.max(0, currentAssetQuantity - assetQuantityDelta);
+      const nextSource = Math.max(0, (current[draft.fromAssetId] ?? 0) - sourceQuantityDelta);
+      const nextTarget = (current[draft.toAssetId] ?? 0) + targetQuantityDelta;
 
       return {
         ...current,
-        [BASE_ASSET_ID]: Number(nextBase.toFixed(8)),
-        [draft.assetId]: Number(nextAsset.toFixed(8)),
+        [draft.fromAssetId]: Number(nextSource.toFixed(8)),
+        [draft.toAssetId]: Number(nextTarget.toFixed(8)),
       };
     });
 
@@ -496,6 +570,14 @@ function App() {
 
       <div className="dashboard-grid">
         <div className="stack">
+          <StatementImporter
+            latestSnapshot={latestStatement}
+            importCount={statementSnapshots.length}
+            importing={statementImporting}
+            importError={statementImportError}
+            onImportFiles={importStatementFiles}
+            onApplyBalances={applyImportedBalances}
+          />
           <AssetTable
             assets={filteredAssets}
             holdings={holdings}
@@ -632,7 +714,7 @@ function App() {
           <TradePanel
             quotes={quotes}
             selectedAssetId={selectedAssetId}
-            baseAssetQuantity={holdings[BASE_ASSET_ID] ?? 0}
+            holdings={holdings}
             onExecuteTrade={executeTrade}
           />
           <section className="panel">
